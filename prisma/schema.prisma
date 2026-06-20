@@ -1,0 +1,381 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id                  String               @id @default(cuid())
+  name                String
+  slug                String               @unique
+  apiKey              String               @unique @default(cuid())
+  createdAt           DateTime             @default(now())
+  subdomain           String?              @unique
+  plan                Plan                 @default(TRIAL)
+  status              OrgStatus            @default(ACTIVE)
+  mrr                 Int                  @default(0)
+  trialEndsAt         DateTime?
+  healthScore         Int                  @default(80)
+  entriesCount        Int                  @default(0)
+  queriesPerDay       Int                  @default(0)
+  membersCount        Int                  @default(0)
+  lastActiveAt        DateTime?
+  onboardingStage     String?
+  stageEnteredAt      DateTime?
+  agentLogs           AgentQueryLog[]
+  aiJobs              AiJob[]
+  billingEvents       BillingEvent[]
+  connectedAccounts   ConnectedAccount[]
+  impersonationTokens ImpersonationToken[]
+  entries             KnowledgeEntry[]
+  platformAlerts      PlatformAlert[]
+  auditEvents         PlatformAuditLog[]
+  rawSourceRecords RawSourceRecord[]
+  knowledgeChunks  KnowledgeChunk[]
+  queryLogs           QueryLog[]
+  sources             Source[]
+  users               User[]
+}
+
+model SuperAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model PlatformAlert {
+  id             String          @id @default(cuid())
+  severity       AlertSeverity
+  title          String
+  description    String
+  actionLabel    String?
+  resolved       Boolean         @default(false)
+  resolvedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  organizationId String?
+  relatedEntryId String?
+  assignedToId   String?
+  assignedTo     User?           @relation("AlertAssignee", fields: [assignedToId], references: [id])
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  relatedEntry   KnowledgeEntry? @relation("AlertEntry", fields: [relatedEntryId], references: [id])
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  enabled     Boolean  @default(false)
+  scope       String   @default("all")
+  createdAt   DateTime @default(now())
+}
+
+model PlatformAuditLog {
+  id             String        @id @default(cuid())
+  actor          String
+  eventType      String
+  description    String
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model AiJob {
+  id             String       @id @default(cuid())
+  jobType        String
+  source         String?
+  latencyMs      Int
+  success        Boolean      @default(true)
+  autoAccepted   Boolean?
+  tokensUsed     Int?
+  costUsd        Float        @default(0)
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model BillingEvent {
+  id             String       @id @default(cuid())
+  eventType      String
+  amountCents    Int          @default(0)
+  planFrom       String?
+  planTo         String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model QueryLog {
+  id             String       @id @default(cuid())
+  question       String
+  resultCount    Int          @default(0)
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model ImpersonationToken {
+  id             String       @id @default(cuid())
+  token          String       @unique @default(cuid())
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  name               String?
+  title              String?
+  department         String?
+  passwordHash       String
+  role               Role                 @default(MEMBER)
+  createdAt          DateTime             @default(now())
+  organizationId     String
+  connectedAccounts  ConnectedAccount[]
+  entries            KnowledgeEntry[]     @relation("EntryAuthor")
+  ownedEntries       KnowledgeEntry[]     @relation("EntryOwner")
+  rawSourceRecords RawSourceRecord[]
+  knowledgeChunks  KnowledgeChunk[]
+  onboardingProgress OnboardingProgress[]
+  assignedAlerts     PlatformAlert[]      @relation("AlertAssignee")
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model RawSourceRecord {
+  id          String @id @default(cuid())
+
+  provider    SourceType
+  recordType  String
+
+  externalId  String
+  title       String?
+  content     String?
+  payload     Json
+
+  sourceId    String
+  source      Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  syncedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chunks      KnowledgeChunk[]
+
+  @@unique([sourceId, externalId])
+  @@index([provider])
+  @@index([recordType])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([sourceId])
+}
+
+model KnowledgeChunk {
+  id          String @id @default(cuid())
+
+  content     String
+  summary     String?
+  metadata    Json?
+
+  visibility  KnowledgeVisibility @default(PERSONAL)
+
+  rawRecordId String?
+  rawRecord   RawSourceRecord? @relation(fields: [rawRecordId], references: [id], onDelete: Cascade)
+
+  sourceId    String?
+  source      Source? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  userId      String
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([sourceId])
+  @@index([visibility])
+}
+
+model ConnectedAccount {
+  id                String       @id @default(cuid())
+  provider          SourceType
+  providerAccountId String?
+  providerEmail     String?
+  accessToken       String?
+  refreshToken      String?
+  tokenType         String?
+  revokedAt         DateTime?
+  scope             String?
+  expiresAt         DateTime?
+  workspaceId       String?
+  workspaceName     String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  userId            String
+  organizationId    String
+  sourceId          String?
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source            Source?      @relation(fields: [sourceId], references: [id])
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, providerAccountId])
+  @@index([organizationId])
+  @@index([provider])
+}
+
+model Source {
+  id                String             @id @default(cuid())
+  type              SourceType
+  name              String
+  status            SourceStatus       @default(DISCONNECTED)
+  config            Json?
+  lastSyncAt        DateTime?
+  createdAt         DateTime           @default(now())
+  organizationId    String
+  citations         Citation[]
+  connectedAccounts ConnectedAccount[]
+  entries           KnowledgeEntry[]
+  rawRecords      RawSourceRecord[]
+knowledgeChunks KnowledgeChunk[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeEntry {
+  id                 String               @id @default(cuid())
+  title              String
+  type               KnowledgeType        @default(PROCESS)
+  status             KnowledgeStatus      @default(PUBLISHED)
+  summary            String
+  content            String
+  tags               String[]             @default([])
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  organizationId     String
+  sourceId           String?
+  authorId           String?
+  ownerId            String?
+  citations          Citation[]
+  author             User?                @relation("EntryAuthor", fields: [authorId], references: [id])
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner              User?                @relation("EntryOwner", fields: [ownerId], references: [id])
+  source             Source?              @relation(fields: [sourceId], references: [id])
+  onboardingProgress OnboardingProgress[]
+  alerts             PlatformAlert[]      @relation("AlertEntry")
+
+  @@index([organizationId])
+}
+
+model Citation {
+  id               String         @id @default(cuid())
+  excerpt          String
+  author           String?
+  url              String?
+  occurredAt       DateTime?
+  createdAt        DateTime       @default(now())
+  knowledgeEntryId String
+  sourceId         String?
+  knowledgeEntry   KnowledgeEntry @relation(fields: [knowledgeEntryId], references: [id], onDelete: Cascade)
+  source           Source?        @relation(fields: [sourceId], references: [id])
+}
+
+model OnboardingProgress {
+  id               String         @id @default(cuid())
+  completedAt      DateTime       @default(now())
+  userId           String
+  knowledgeEntryId String
+  knowledgeEntry   KnowledgeEntry @relation(fields: [knowledgeEntryId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, knowledgeEntryId])
+}
+
+model AgentQueryLog {
+  id             String       @id @default(cuid())
+  query          String
+  resultIds      String[]     @default([])
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum SourceType {
+  SLACK
+  NOTION
+  GMAIL
+  JIRA
+  LINEAR
+  GITHUB
+  CONFLUENCE
+  GDRIVE
+  ZOOM
+  HUBSPOT
+  MANUAL
+}
+
+enum SourceStatus {
+  CONNECTED
+  DISCONNECTED
+  SYNCING
+  ERROR
+}
+
+enum KnowledgeType {
+  PROCESS
+  DECISION
+  EXCEPTION
+  POLICY
+}
+
+enum KnowledgeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Plan {
+  TRIAL
+  STARTER
+  GROWTH
+  SCALE
+}
+
+enum OrgStatus {
+  ACTIVE
+  AT_RISK
+  SUSPENDED
+  CANCELLED
+}
+
+enum AlertSeverity {
+  CRITICAL
+  WARNING
+  INFO
+}
+
+enum KnowledgeVisibility {
+  PERSONAL
+  ORGANIZATION
+}
