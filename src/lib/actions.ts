@@ -227,11 +227,25 @@ export async function toggleOnboardingProgress(formData: FormData) {
       where: { userId: session.user.id, knowledgeEntryId: entryId },
     });
   } else {
-    await prisma.onboardingProgress.upsert({
-      where: { userId_knowledgeEntryId: { userId: session.user.id, knowledgeEntryId: entryId } },
-      create: { userId: session.user.id, knowledgeEntryId: entryId },
-      update: {},
-    });
+    if (!session?.user?.id) {
+  throw new Error("Unauthorized");
+}
+
+const userId = session.user.id;
+
+await prisma.onboardingProgress.upsert({
+  where: {
+    userId_knowledgeEntryId: {
+      userId,
+      knowledgeEntryId: entryId,
+    },
+  },
+  create: {
+    userId,
+    knowledgeEntryId: entryId,
+  },
+  update: {},
+});
   }
 
   revalidatePath("/dashboard/onboarding");
