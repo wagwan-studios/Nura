@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { syncSourceToKnowledge } from "@/lib/connectors/sync-source";
 import { encryptToken } from "@/lib/encryption";
 
 export async function GET(req: NextRequest) {
@@ -82,7 +83,6 @@ export async function GET(req: NextRequest) {
     },
     update: {
       status: "CONNECTED",
-      lastSyncAt: new Date(),
       name: githubUser.login ? `GitHub - ${githubUser.login}` : "GitHub",
     },
     create: {
@@ -122,6 +122,16 @@ export async function GET(req: NextRequest) {
       sourceId: source.id,
     },
   });
+
+  try {
+  await syncSourceToKnowledge({
+    sourceId: source.id,
+    userId,
+    organizationId,
+  });
+} catch (error) {
+  console.error("GitHub auto-sync failed after connect:", error);
+}
 
   return NextResponse.redirect(
     `${process.env.APP_URL}/dashboard/sources?github=connected`

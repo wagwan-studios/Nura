@@ -199,7 +199,7 @@ export async function generateChatAnswer(messages: ChatMessage[]) {
         model: config.chatModel,
         messages,
         temperature: 0.2,
-         max_tokens: Number(process.env.AI_MAX_TOKENS || "1500"),
+         max_tokens: Number(process.env.AI_MAX_TOKENS || "2000"),
       }),
     });
 

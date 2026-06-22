@@ -10,36 +10,63 @@ type QdrantPayload = {
   userId?: string;
   organizationId?: string;
   visibility?: "PERSONAL" | "ORGANIZATION";
+  provider?: string;
+  recordType?: string;
+  title?: string;
 };
 
 export async function searchKnowledge({
   query,
   userId,
   organizationId,
-  limit = 8,
+  provider,
+  recordType,
+  limit = 20,
 }: {
   query: string;
   userId: string;
   organizationId: string;
+  provider?: string | null;
+  recordType?: string | null;
   limit?: number;
 }) {
   await ensureQdrantCollection();
 
   const embedding = await createEmbedding(query);
 
+  const mustFilters: any[] = [
+    {
+      key: "organizationId",
+      match: {
+        value: organizationId,
+      },
+    },
+  ];
+
+  if (provider) {
+    mustFilters.push({
+      key: "provider",
+      match: {
+        value: provider,
+      },
+    });
+  }
+
+  if (recordType) {
+    mustFilters.push({
+      key: "recordType",
+      match: {
+        value: recordType,
+      },
+    });
+  }
+
   const result = await qdrant.search(QDRANT_COLLECTION, {
     vector: embedding,
     limit,
     with_payload: true,
     filter: {
-      must: [
-        {
-          key: "organizationId",
-          match: {
-            value: organizationId,
-          },
-        },
-      ],
+      must: mustFilters,
       should: [
         {
           key: "userId",
@@ -66,6 +93,9 @@ export async function searchKnowledge({
       sourceId: payload.sourceId || null,
       rawRecordId: payload.rawRecordId || null,
       similarity: item.score || 0,
+      provider: payload.provider || null,
+      recordType: payload.recordType || null,
+      title: payload.title || null,
     };
   });
 }

@@ -6,6 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+   directUrl = env("DIRECT_URL")
 }
 
 model Organization {
@@ -39,6 +40,80 @@ model Organization {
   queryLogs           QueryLog[]
   sources             Source[]
   users               User[]
+  askNuraConversations AskNuraConversation[]
+  askNuraMessages      AskNuraMessage[]
+  askNuraCaches        AskNuraCache[]
+}
+
+model AskNuraConversation {
+  id             String   @id @default(cuid())
+  title          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  userId         String
+  organizationId String
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  messages       AskNuraMessage[]
+  cacheItems     AskNuraCache[]
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model AskNuraMessage {
+  id             String   @id @default(cuid())
+  role           String
+  content        String
+  sources        Json?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  conversationId String
+  conversation   AskNuraConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId         String
+  organizationId String
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model AskNuraCache {
+  id                String   @id @default(cuid())
+  question          String
+  normalizedQuestion String
+  questionHash      String
+  answer            String
+  sources           Json?
+  model             String?
+  provider          String?
+  sourceVersion     DateTime?
+  expiresAt         DateTime?
+  hitCount          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  conversationId    String?
+  conversation      AskNuraConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  userId            String
+  organizationId    String
+
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, questionHash])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([questionHash])
 }
 
 model SuperAdmin {
@@ -148,6 +223,9 @@ model User {
   onboardingProgress OnboardingProgress[]
   assignedAlerts     PlatformAlert[]      @relation("AlertAssignee")
   organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  askNuraConversations AskNuraConversation[]
+  askNuraMessages      AskNuraMessage[]
+  askNuraCaches        AskNuraCache[]
 }
 
 model RawSourceRecord {

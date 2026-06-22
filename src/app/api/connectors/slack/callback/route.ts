@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { syncSourceToKnowledge } from "@/lib/connectors/sync-source";
 import { prisma } from "@/lib/prisma";
 import { encryptToken } from "@/lib/encryption";
 
@@ -78,7 +79,6 @@ export async function GET(req: NextRequest) {
     },
     update: {
       status: "CONNECTED",
-      lastSyncAt: new Date(),
       name: tokenData.team?.name
       ? `Slack - ${tokenData.team.name}`
       : "Slack",
@@ -133,6 +133,16 @@ export async function GET(req: NextRequest) {
       sourceId: source.id,
     },
   });
+
+  try {
+  await syncSourceToKnowledge({
+    sourceId: source.id,
+    userId,
+    organizationId,
+  });
+} catch (error) {
+  console.error("Slack auto-sync failed after connect:", error);
+}
 
   return NextResponse.redirect(
     `${process.env.APP_URL}/dashboard/sources?slack=connected`

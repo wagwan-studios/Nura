@@ -7,6 +7,8 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { SOURCE_ICON_BG } from "@/lib/ui";
 import type { SourceType } from "@prisma/client";
 import { RemoveSourceButton } from "./RemoveSourceButton";
+import { SyncSourceButton } from "@/components/SyncSourceButton";
+import { SyncAllSourcesButton } from "@/components/SyncAllSourcesButton";
 
 const AVAILABLE_CONNECTORS: {
   type: SourceType;
@@ -127,6 +129,8 @@ const connectedSources = await prisma.source.findMany({
     _count: {
       select: {
         entries: true,
+        rawRecords: true,
+    knowledgeChunks: true,
         connectedAccounts: true,
       },
     },
@@ -173,9 +177,13 @@ const connectedSources = await prisma.source.findMany({
   return (
     <div className="space-y-6">
       <div className="page-header">
-        <h1>Sources</h1>
-        <p>Connect the tools where HIQOR&apos;s team knowledge already lives.</p>
-      </div>
+  <div>
+    <h1>Sources</h1>
+    <p>Connect the tools where HIQOR&apos;s team knowledge already lives.</p>
+  </div>
+
+  <SyncAllSourcesButton />
+</div>
 
       <div className="card">
         <div className="card-header">
@@ -300,23 +308,28 @@ const connectedSources = await prisma.source.findMany({
                   </div>
 
                   <div className="integration-meta">
-                    {source._count.entries} entries
+                    {source._count.rawRecords} records · {source._count.knowledgeChunks} chunks
+                    {/* {source._count.entries} entries */}
                     {source.lastSyncAt
                       ? ` · synced ${source.lastSyncAt.toLocaleDateString()}`
                       : ""}
                   </div>
 
                   <div className="integration-actions">
-                    <Link
-                      href={`/dashboard/sources/${source.id}`}
-                      className="btn btn-secondary"
-                      style={{ flex: 1, justifyContent: "center" }}
-                    >
-                      View
-                    </Link>
+  <Link
+    href={`/dashboard/sources/${source.id}`}
+    className="btn btn-secondary"
+    style={{ flex: 1, justifyContent: "center" }}
+  >
+    View
+  </Link>
 
-                    <RemoveSourceButton sourceId={source.id} />
-                  </div>
+  <SyncSourceButton sourceId={source.id} />
+
+  <RemoveSourceButton sourceId={source.id} />
+</div>
+
+
                 </div>
               ))}
             </div>

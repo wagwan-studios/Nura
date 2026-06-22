@@ -9,11 +9,16 @@ type AskSource = {
   rawRecordId: string | null;
   similarity: number;
   preview: string;
+   provider?: string | null;
+  recordType?: string | null;
+  title?: string | null;
+  time?: string | null;
 };
 
 type AskResponse = {
   answer: string;
   sources: AskSource[];
+  cached?: boolean;
 };
 
 export default function AskNuraClient({
@@ -207,7 +212,7 @@ export default function AskNuraClient({
           </h2>
 
           <div style={{ display: "grid", gap: 12 }}>
-            {sources.map((source) => (
+            {/* {sources.map((source) => (
               <div
                 key={source.id}
                 style={{
@@ -243,7 +248,90 @@ export default function AskNuraClient({
                   {source.preview}
                 </p>
               </div>
-            ))}
+            ))} */}
+            {sources.map((source) => (
+  <div
+    key={source.id}
+    style={{
+      border: "1px solid var(--border, #e5e7eb)",
+      borderRadius: 14,
+      padding: 16,
+      background: "var(--card, #fff)",
+      boxShadow: "0 4px 18px rgba(0,0,0,0.03)",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 12,
+        marginBottom: 10,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: "4px 8px",
+              borderRadius: 999,
+              background: "#f3f4f6",
+              color: "#374151",
+            }}
+          >
+            {source.provider || "SOURCE"}
+          </span>
+
+          {source.recordType ? (
+            <span
+              style={{
+                fontSize: 12,
+                color: "#6b7280",
+                textTransform: "capitalize",
+              }}
+            >
+              {source.recordType.replaceAll("_", " ")}
+            </span>
+          ) : null}
+        </div>
+
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
+          {source.title || `Source ${source.number}`}
+        </h3>
+
+        {source.time ? (
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>
+            {source.time}
+          </p>
+        ) : null}
+      </div>
+
+      <span style={{ fontSize: 12, color: "#6b7280" }}>
+        Score: {Number(source.similarity).toFixed(3)}
+      </span>
+    </div>
+
+    <p
+      style={{
+        margin: 0,
+        color: "#374151",
+        lineHeight: 1.6,
+        fontSize: 14,
+      }}
+    >
+      {source.preview}
+    </p>
+  </div>
+))}
           </div>
         </div>
       ) : null}

@@ -34,9 +34,9 @@ export const githubAdapter: ConnectorAdapter = {
 
     const accessToken = decryptToken(account.accessToken);
 
-    const reposLimit = Number(process.env.GITHUB_SYNC_REPOS_LIMIT || "5");
-    const commitsLimit = Number(process.env.GITHUB_SYNC_COMMITS_LIMIT || "5");
-    const prsLimit = Number(process.env.GITHUB_SYNC_PRS_LIMIT || "5");
+    const reposLimit = Number(process.env.GITHUB_SYNC_REPOS_LIMIT || "100");
+    const commitsLimit = Number(process.env.GITHUB_SYNC_COMMITS_LIMIT || "10");
+    const prsLimit = Number(process.env.GITHUB_SYNC_PRS_LIMIT || "10");
 
     const reposRes = await fetch(
       `https://api.github.com/user/repos?per_page=${reposLimit}&sort=updated&affiliation=owner,collaborator,organization_member`,
