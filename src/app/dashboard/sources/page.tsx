@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -20,7 +19,7 @@ const AVAILABLE_CONNECTORS: {
     type: "GMAIL",
     name: "Gmail",
     description: "Connect Gmail to sync emails and conversations.",
-    connectUrl: null,
+    connectUrl: "/api/connectors/gmail/connect",
   },
   {
     type: "GITHUB",
@@ -91,99 +90,99 @@ export default async function SourcesPage() {
     return null;
   }
 
-
   const userId = session.user.id as string;
-const organizationId = session.user.organizationId as string;
+  const organizationId = session.user.organizationId as string;
 
-const connectedSources = await prisma.source.findMany({
-  where: {
-    organizationId,
-    status: "CONNECTED",
-    connectedAccounts: {
-      some: {
-        userId,
-        accessToken: {
-          not: null,
+  const connectedSources = await prisma.source.findMany({
+    where: {
+      organizationId,
+      status: "CONNECTED",
+      connectedAccounts: {
+        some: {
+          userId,
+          accessToken: {
+            not: null,
+          },
         },
       },
     },
-  },
-  orderBy: {
-    createdAt: "desc",
-  },
-  include: {
-    connectedAccounts: {
-      where: {
-        userId,
-        accessToken: {
-          not: null,
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      connectedAccounts: {
+        where: {
+          userId,
+          accessToken: {
+            not: null,
+          },
+        },
+        select: {
+          id: true,
+          provider: true,
+          providerEmail: true,
+          createdAt: true,
         },
       },
-      select: {
-        id: true,
-        provider: true,
-        providerEmail: true,
-        createdAt: true,
+      _count: {
+        select: {
+          entries: true,
+          rawRecords: true,
+          knowledgeChunks: true,
+          connectedAccounts: true,
+        },
       },
     },
-    _count: {
-      select: {
-        entries: true,
-        rawRecords: true,
-    knowledgeChunks: true,
-        connectedAccounts: true,
-      },
-    },
-  },
-});
-//   const connectedSources = await prisma.source.findMany({
-//   where: {
-//     organizationId: session.user.organizationId,
-//     status: "CONNECTED",
-//     connectedAccounts: {
-//       some: {
-//         accessToken: {
-//           not: null,
-//         },
-//       },
-//     },
-//   },
-//   orderBy: {
-//     createdAt: "desc",
-//   },
-//   include: {
-//     _count: {
-//       select: {
-//         entries: true,
-//         connectedAccounts: true,
-//       },
-//     },
-//   },
-// });
+  });
+  //   const connectedSources = await prisma.source.findMany({
+  //   where: {
+  //     organizationId: session.user.organizationId,
+  //     status: "CONNECTED",
+  //     connectedAccounts: {
+  //       some: {
+  //         accessToken: {
+  //           not: null,
+  //         },
+  //       },
+  //     },
+  //   },
+  //   orderBy: {
+  //     createdAt: "desc",
+  //   },
+  //   include: {
+  //     _count: {
+  //       select: {
+  //         entries: true,
+  //         connectedAccounts: true,
+  //       },
+  //     },
+  //   },
+  // });
 
+  const availableConnectors = AVAILABLE_CONNECTORS.map((connector) => {
+    const connectedSource = connector.connectUrl
+      ? connectedSources.find((source) => source.type === connector.type)
+      : null;
 
- const availableConnectors = AVAILABLE_CONNECTORS.map((connector) => {
-  const connectedSource = connector.connectUrl
-    ? connectedSources.find((source) => source.type === connector.type)
-    : null;
-
-  return {
-    ...connector,
-    isConnected: Boolean(connector.connectUrl && connectedSource),
-    sourceId: connectedSource?.id ?? null,
-  };
-});
+    return {
+      ...connector,
+      isConnected: Boolean(connector.connectUrl && connectedSource),
+      sourceId: connectedSource?.id ?? null,
+    };
+  });
 
   return (
     <div className="space-y-6">
       <div className="page-header">
-  <div>
-    <h1>Sources</h1>
-    <p>Connect the tools where HIQOR&apos;s team knowledge already lives.</p>
-  </div>
+        <div>
+          <h1>Sources</h1>
+          <p>
+            Connect the tools where HIQOR&apos;s team knowledge already lives.
+          </p>
+        </div>
 
-  <SyncAllSourcesButton />
-</div>
+        <SyncAllSourcesButton />
+      </div>
 
       <div className="card">
         <div className="card-header">
@@ -210,52 +209,52 @@ const connectedSources = await prisma.source.findMany({
                     <div className="integration-type">{connector.type}</div>
                   </div>
 
-                 {connector.isConnected ? (
-  <span
-    className="pill pill-green"
-    style={{ marginLeft: "auto" }}
-  >
-    Connected
-  </span>
-) : connector.connectUrl ? (
-  <span className="pill" style={{ marginLeft: "auto" }}>
-    Not connected
-  </span>
-) : (
-  <span className="pill" style={{ marginLeft: "auto" }}>
-    Coming soon
-  </span>
-)}
+                  {connector.isConnected ? (
+                    <span
+                      className="pill pill-green"
+                      style={{ marginLeft: "auto" }}
+                    >
+                      Connected
+                    </span>
+                  ) : connector.connectUrl ? (
+                    <span className="pill" style={{ marginLeft: "auto" }}>
+                      Not connected
+                    </span>
+                  ) : (
+                    <span className="pill" style={{ marginLeft: "auto" }}>
+                      Coming soon
+                    </span>
+                  )}
                 </div>
 
                 <div className="integration-meta">{connector.description}</div>
 
                 <div className="integration-actions">
-         {connector.isConnected && connector.sourceId ? (
-  <Link
-    href={`/dashboard/sources/${connector.sourceId}`}
-    className="btn btn-secondary"
-    style={{ flex: 1, justifyContent: "center" }}
-  >
-    View source
-  </Link>
-) : connector.connectUrl ? (
-                <Link
-                  href={connector.connectUrl}
-                  className="btn btn-primary"
-                  style={{ flex: 1, justifyContent: "center" }}
-                >
-                  Connect now
-                </Link>
-              ) : (
-                <button
-                  className="btn btn-secondary"
-                  style={{ flex: 1, justifyContent: "center" }}
-                  disabled
-                >
-                  Coming soon
-                </button>
-              )}
+                  {connector.isConnected && connector.sourceId ? (
+                    <Link
+                      href={`/dashboard/sources/${connector.sourceId}`}
+                      className="btn btn-secondary"
+                      style={{ flex: 1, justifyContent: "center" }}
+                    >
+                      View source
+                    </Link>
+                  ) : connector.connectUrl ? (
+                    <Link
+                      href={connector.connectUrl}
+                      className="btn btn-primary"
+                      style={{ flex: 1, justifyContent: "center" }}
+                    >
+                      Connect now
+                    </Link>
+                  ) : (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ flex: 1, justifyContent: "center" }}
+                      disabled
+                    >
+                      Coming soon
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -308,7 +307,8 @@ const connectedSources = await prisma.source.findMany({
                   </div>
 
                   <div className="integration-meta">
-                    {source._count.rawRecords} records · {source._count.knowledgeChunks} chunks
+                    {source._count.rawRecords} records ·{" "}
+                    {source._count.knowledgeChunks} chunks
                     {/* {source._count.entries} entries */}
                     {source.lastSyncAt
                       ? ` · synced ${source.lastSyncAt.toLocaleDateString()}`
@@ -316,20 +316,18 @@ const connectedSources = await prisma.source.findMany({
                   </div>
 
                   <div className="integration-actions">
-  <Link
-    href={`/dashboard/sources/${source.id}`}
-    className="btn btn-secondary"
-    style={{ flex: 1, justifyContent: "center" }}
-  >
-    View
-  </Link>
+                    <Link
+                      href={`/dashboard/sources/${source.id}`}
+                      className="btn btn-secondary"
+                      style={{ flex: 1, justifyContent: "center" }}
+                    >
+                      View
+                    </Link>
 
-  <SyncSourceButton sourceId={source.id} />
+                    <SyncSourceButton sourceId={source.id} />
 
-  <RemoveSourceButton sourceId={source.id} />
-</div>
-
-
+                    <RemoveSourceButton sourceId={source.id} />
+                  </div>
                 </div>
               ))}
             </div>
