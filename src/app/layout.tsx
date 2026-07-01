@@ -32,9 +32,39 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+
 export const metadata: Metadata = {
-  title: "Nura — Company Memory Layer",
+  title: "Nura | Your Company Memory Layer",
   description: "Capture, structure, and surface your company's institutional knowledge.",
+  metadataBase: new URL("https://asknura.io"),
+
+  
+    icons: {
+    icon: "/Nura-fav-Icon.svg",
+  },
+  
+  openGraph: {
+    title: "Nura | Your Company Memory Layer",
+    description: "Capture, structure, and surface your company's institutional knowledge.",
+    url: "https://asknura.io",
+    siteName: "Nura",
+    images: [
+      {
+        url: "/Nura-Thumbnail.jpeg",
+        width: 1200,
+        height: 630,
+        alt: "Nura | Your Company Memory Layer",
+      },
+    ],
+    type: "website",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Nura | Your Company Memory Layer",
+    description: "Capture, structure, and surface your company's institutional knowledge.",
+    images: ["/Nura-Thumbnail.jpeg"],
+  },
 };
 
 export default function RootLayout({

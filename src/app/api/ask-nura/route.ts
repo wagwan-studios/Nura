@@ -770,13 +770,31 @@ if (queryPlan.intent === "MULTI_SOURCE_WORK_SUMMARY") {
     take: 80,
   });
 
-  const semanticChunks = await searchKnowledge({
+  // const semanticChunks = await searchKnowledge({
+  //   query: queryPlan.rewrittenQuestion || question,
+  //   userId,
+  //   organizationId,
+  //   provider: null,
+  //   limit: 25,
+  // });
+
+  let semanticChunks: any[] = [];
+
+try {
+  semanticChunks = await searchKnowledge({
     query: queryPlan.rewrittenQuestion || question,
     userId,
     organizationId,
     provider: null,
     limit: 25,
   });
+} catch (error) {
+  console.error("Vector search failed, continuing with direct DB only:", {
+    message: error instanceof Error ? error.message : String(error),
+  });
+
+  semanticChunks = [];
+}
 
   const directContext = records
     .map(
@@ -1472,13 +1490,30 @@ return createPremiumResponse({
     const limit = Number(process.env.ASK_NURA_SEARCH_LIMIT || "20");
 
 
-    const chunks = await searchKnowledge({
-      query: queryPlan.rewrittenQuestion || question,
-      userId,
-      organizationId,
-      provider,
-      limit,
-    });
+    // const chunks = await searchKnowledge({
+    //   query: queryPlan.rewrittenQuestion || question,
+    //   userId,
+    //   organizationId,
+    //   provider,
+    //   limit,
+    // });
+    let chunks: any[] = [];
+
+try {
+  chunks = await searchKnowledge({
+    query: queryPlan.rewrittenQuestion || question,
+    userId,
+    organizationId,
+    provider,
+    limit,
+  });
+} catch (error) {
+  console.error("Vector search failed in fallback answer:", {
+    message: error instanceof Error ? error.message : String(error),
+  });
+
+  chunks = [];
+}
 
     const context = chunks
   .map((chunk) => formatChunkForAi(chunk))
