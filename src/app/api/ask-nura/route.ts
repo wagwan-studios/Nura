@@ -9,6 +9,7 @@ import { searchKnowledge } from "@/lib/knowledge/search";
 import { generateChatAnswerWithUsage } from "@/lib/ai/provider";
 import { planAskNuraQueryWithUsage } from "@/lib/ask-nura/query-planner";
 import { estimateAiCostUsd, logAiJob } from "@/lib/ai/usage";
+import { SourceType } from "@prisma/client";
 
 
 type PremiumSource = {
@@ -247,6 +248,14 @@ function createAskNuraJsonResponse({
     sources,
     cached,
   });
+}
+
+function toRawSourceProviders(providers: string[]): SourceType[] {
+  const allowedProviders = new Set<string>(Object.values(SourceType));
+
+  return providers.filter((provider): provider is SourceType =>
+    allowedProviders.has(provider)
+  );
 }
 
 function detectProvider(question: string) {
@@ -706,13 +715,15 @@ if (plannerResult.usage) {
 console.log("Ask Nura query plan:", queryPlan);
 
 if (queryPlan.intent === "MULTI_SOURCE_WORK_SUMMARY") {
-  const providerFilter = queryPlan.providers.length
-    ? {
-        provider: {
-          in: queryPlan.providers,
-        },
-      }
-    : {};
+  const rawSourceProviders = toRawSourceProviders(queryPlan.providers || []);
+
+const providerFilter = rawSourceProviders.length
+  ? {
+      provider: {
+        in: rawSourceProviders,
+      },
+    }
+  : {};
 
   const recordTypeFilter = queryPlan.recordTypes.length
     ? {
