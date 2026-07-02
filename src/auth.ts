@@ -8,8 +8,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   debug: true,
 
   logger: {
-    error(code, metadata) {
-      console.error("AUTH ERROR:", code, metadata);
+    error(code) {
+      console.error("AUTH ERROR:", code);
     },
     warn(code) {
       console.warn("AUTH WARN:", code);
