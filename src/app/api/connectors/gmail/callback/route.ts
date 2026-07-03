@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encryptToken } from "@/lib/encryption";
-import { syncSourceToKnowledge } from "@/lib/connectors/sync-source";
-
+import { startSourceSyncInBackground } from "@/lib/connectors/background-sync";
 export async function GET(req: NextRequest) {
   try {
     const error = req.nextUrl.searchParams.get("error");
@@ -141,13 +140,14 @@ export async function GET(req: NextRequest) {
 });
 
     try {
-      await syncSourceToKnowledge({
-        sourceId: source.id,
-        userId,
-        organizationId,
-      });
+    startSourceSyncInBackground({
+    sourceId: source.id,
+    userId,
+    organizationId,
+    reason: "connect"
+  });
     } catch (syncError) {
-      console.error("Gmail auto-sync failed:", syncError);
+      console.error("Auto-sync could not be started after connect:", syncError);
     }
 
     return NextResponse.redirect(

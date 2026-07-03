@@ -19,6 +19,12 @@ type IngestInput = {
   visibility?: KnowledgeVisibility;
 };
 
+type PreparedChunk = {
+  id: string;
+  content: string;
+  embedding: number[];
+};
+
 function validateEmbeddingDimension(vector: number[]) {
   const expected = Number(process.env.AI_EMBEDDING_DIMENSIONS || "1536");
 
@@ -29,9 +35,116 @@ function validateEmbeddingDimension(vector: number[]) {
   }
 }
 
-export async function ingestRawRecord(input: IngestInput) {
-  await ensureQdrantCollection();
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
 
+async function indexRawRecord(input: IngestInput, rawRecordId: string) {
+  const chunks = chunkText(input.content);
+
+  if (!chunks.length) {
+    return {
+      chunksCreated: 0,
+      vectorIndexed: true,
+    };
+  }
+
+  const preparedChunks: PreparedChunk[] = [];
+
+  for (const chunk of chunks) {
+    const embedding = await createEmbedding(chunk);
+    validateEmbeddingDimension(embedding);
+
+    preparedChunks.push({
+      id: crypto.randomUUID(),
+      content: chunk,
+      embedding,
+    });
+  }
+
+  const oldChunks = await prisma.knowledgeChunk.findMany({
+    where: {
+      rawRecordId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (oldChunks.length > 0) {
+    try {
+      await qdrant.delete(QDRANT_COLLECTION, {
+        points: oldChunks.map((chunk) => chunk.id),
+      });
+    } catch (error) {
+      console.error("Qdrant old chunk delete failed, continuing:", {
+        rawRecordId,
+        error: getErrorMessage(error),
+      });
+    }
+  }
+
+  await prisma.knowledgeChunk.deleteMany({
+    where: {
+      rawRecordId,
+    },
+  });
+
+  await prisma.knowledgeChunk.createMany({
+    data: preparedChunks.map((chunk) => ({
+      id: chunk.id,
+      content: chunk.content,
+      visibility: input.visibility ?? "PERSONAL",
+      rawRecordId,
+      sourceId: input.sourceId,
+      userId: input.userId,
+      organizationId: input.organizationId,
+    })),
+  });
+
+  let vectorIndexed = true;
+
+  try {
+    await ensureQdrantCollection();
+
+    await qdrant.upsert(QDRANT_COLLECTION, {
+      wait: true,
+      points: preparedChunks.map((chunk) => ({
+        id: chunk.id,
+        vector: chunk.embedding,
+        payload: {
+          chunkId: chunk.id,
+          content: chunk.content,
+          provider: input.provider,
+          recordType: input.recordType,
+          sourceId: input.sourceId,
+          rawRecordId,
+          userId: input.userId,
+          organizationId: input.organizationId,
+          visibility: input.visibility ?? "PERSONAL",
+          title: input.title ?? null,
+        },
+      })),
+    });
+  } catch (error) {
+    vectorIndexed = false;
+
+    console.error("Qdrant vector upsert failed after chunks were saved:", {
+      rawRecordId,
+      sourceId: input.sourceId,
+      provider: input.provider,
+      recordType: input.recordType,
+      error: getErrorMessage(error),
+    });
+  }
+
+  return {
+    chunksCreated: preparedChunks.length,
+    vectorIndexed,
+  };
+}
+
+export async function ingestRawRecord(input: IngestInput) {
   const rawRecord = await prisma.rawSourceRecord.upsert({
     where: {
       sourceId_externalId: {
@@ -60,72 +173,32 @@ export async function ingestRawRecord(input: IngestInput) {
     },
   });
 
-  const oldChunks = await prisma.knowledgeChunk.findMany({
-    where: {
+  try {
+    const indexResult = await indexRawRecord(input, rawRecord.id);
+
+    return {
+      rawRecord,
+      chunksCreated: indexResult.chunksCreated,
+      indexingFailed: false,
+      vectorIndexed: indexResult.vectorIndexed,
+    };
+  } catch (error) {
+    const message = getErrorMessage(error);
+
+    console.error("Knowledge indexing failed, raw record was still synced:", {
       rawRecordId: rawRecord.id,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (oldChunks.length > 0) {
-    await qdrant.delete(QDRANT_COLLECTION, {
-      points: oldChunks.map((chunk) => chunk.id),
+      sourceId: input.sourceId,
+      provider: input.provider,
+      recordType: input.recordType,
+      error: message,
     });
+
+    return {
+      rawRecord,
+      chunksCreated: 0,
+      indexingFailed: true,
+      indexingError: message,
+      vectorIndexed: false,
+    };
   }
-
-  await prisma.knowledgeChunk.deleteMany({
-    where: {
-      rawRecordId: rawRecord.id,
-    },
-  });
-
-  const chunks = chunkText(input.content);
-
-  for (const chunk of chunks) {
-    const chunkId = crypto.randomUUID();
-    const embedding = await createEmbedding(chunk);
-
-    validateEmbeddingDimension(embedding);
-
-    await prisma.knowledgeChunk.create({
-      data: {
-        id: chunkId,
-        content: chunk,
-        visibility: input.visibility ?? "PERSONAL",
-        rawRecordId: rawRecord.id,
-        sourceId: input.sourceId,
-        userId: input.userId,
-        organizationId: input.organizationId,
-      },
-    });
-
-    await qdrant.upsert(QDRANT_COLLECTION, {
-      wait: true,
-      points: [
-        {
-          id: chunkId,
-          vector: embedding,
-          payload: {
-            chunkId,
-            content: chunk,
-            provider: input.provider,
-            recordType: input.recordType,
-            sourceId: input.sourceId,
-            rawRecordId: rawRecord.id,
-            userId: input.userId,
-            organizationId: input.organizationId,
-            visibility: input.visibility ?? "PERSONAL",
-            title: input.title ?? null,
-          },
-        },
-      ],
-    });
-  }
-
-  return {
-    rawRecord,
-    chunksCreated: chunks.length,
-  };
 }

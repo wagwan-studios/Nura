@@ -89,7 +89,7 @@ const sourceChips = [
   { label: "Linear", type: "LINEAR", className: "chip-linear" },
   { label: "GitHub", type: "GITHUB", className: "chip-github" },
   { label: "Confluence", type: "CONFLUENCE", className: "chip-notion2" },
-  { label: "Google Drive", type: "GDRIVE", className: "chip-drive" },
+  { label: "Google Drive", type: "GOOGLE_DRIVE", className: "chip-drive" },
   { label: "Zoom", type: "ZOOM", className: "chip-zoom" },
   { label: "HubSpot", type: "HUBSPOT", className: "chip-hubspot" },
 ];

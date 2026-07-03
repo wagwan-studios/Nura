@@ -100,7 +100,7 @@ async function main() {
     { key: "eng-linear", name: "Engineering", type: "LINEAR" },
     { key: "platform-repo", name: "hiqor/platform", type: "GITHUB" },
     { key: "compliance-wiki", name: "Compliance & Licensing Wiki", type: "CONFLUENCE" },
-    { key: "legal-drive", name: "Legal & Licensing", type: "GDRIVE" },
+    { key: "legal-drive", name: "Legal & Licensing", type: "GOOGLE_DRIVE" },
     { key: "leadership-sync", name: "Leadership Sync Recordings", type: "ZOOM" },
     { key: "carrier-pipeline", name: "Carrier Pipeline", type: "HUBSPOT" },
   ];

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { syncAllConnectedSourcesToKnowledge } from "@/lib/connectors/sync-source";
+import { startAllSourcesSyncInBackground } from "@/lib/connectors/background-sync";
 
 export async function POST() {
   try {
@@ -10,19 +10,21 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const results = await syncAllConnectedSourcesToKnowledge({
+    const result = startAllSourcesSyncInBackground({
       userId: session.user.id as string,
       organizationId: session.user.organizationId as string,
+      reason: "sync_all",
     });
 
     return NextResponse.json({
       ok: true,
-      results,
+      background: true,
+      ...result,
     });
   } catch (error) {
     return NextResponse.json(
       {
-        error: "Sync all failed",
+        error: "Sync all could not be started",
         message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }

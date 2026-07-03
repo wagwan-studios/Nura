@@ -20,7 +20,7 @@ export const SOURCE_ICON_BG: Record<string, string> = {
   LINEAR: "#F5F5F6",
   GITHUB: "#F0F0F0",
   CONFLUENCE: "#FFFFFF",
-  GDRIVE: "#F5F9FF",
+  GOOGLE_DRIVE: "#F5F9FF",
   ZOOM: "#EAF3FF",
   HUBSPOT: "#FFF3EF",
   MANUAL: "#F5F3EE",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { syncSourceToKnowledge } from "@/lib/connectors/sync-source";
+import { startSourceSyncInBackground } from "@/lib/connectors/background-sync";
 
 export async function POST(
   _req: NextRequest,
@@ -14,21 +14,23 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await syncSourceToKnowledge({
+    const result = startSourceSyncInBackground({
       sourceId: id,
       userId: session.user.id as string,
       organizationId: session.user.organizationId as string,
+      reason: "manual",
     });
 
     return NextResponse.json({
       ok: true,
+      background: true,
       sourceId: id,
-      result,
+      ...result,
     });
   } catch (error) {
     return NextResponse.json(
       {
-        error: "Source sync failed",
+        error: "Source sync could not be started",
         message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }

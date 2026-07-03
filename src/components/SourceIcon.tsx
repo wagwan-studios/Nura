@@ -91,7 +91,7 @@ export function SourceIcon({ type, className = "h-5 w-5" }: { type: string; clas
         </svg>
       );
 
-    case "GDRIVE":
+    case "GOOGLE_DRIVE":
       return (
         <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
           <path fill="#0066DA" d="M8.2 2 2 12.8 4.9 18 11.1 7.2z" />

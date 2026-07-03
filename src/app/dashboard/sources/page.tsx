@@ -34,10 +34,16 @@ const AVAILABLE_CONNECTORS: {
     connectUrl: "/api/connectors/slack/connect",
   },
   {
+    type: "GOOGLE_DRIVE",
+    name: "Google Drive",
+    description: "Sync Google Docs, files, and shared folders.",
+    connectUrl: "/api/connectors/drive/connect",
+  },
+  {
     type: "NOTION",
     name: "Notion",
     description: "Sync Notion pages, docs, and internal knowledge.",
-    connectUrl: null,
+    connectUrl: "/api/connectors/notion/connect",
   },
   {
     type: "JIRA",
@@ -57,12 +63,7 @@ const AVAILABLE_CONNECTORS: {
     description: "Sync Confluence pages, spaces, and documentation.",
     connectUrl: null,
   },
-  {
-    type: "GDRIVE",
-    name: "Google Drive",
-    description: "Sync Google Docs, files, and shared folders.",
-    connectUrl: null,
-  },
+   
   {
     type: "ZOOM",
     name: "Zoom",

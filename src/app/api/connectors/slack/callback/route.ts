@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { syncSourceToKnowledge } from "@/lib/connectors/sync-source";
+import { startSourceSyncInBackground } from "@/lib/connectors/background-sync";
 import { prisma } from "@/lib/prisma";
 import { encryptToken } from "@/lib/encryption";
 
@@ -135,10 +135,11 @@ export async function GET(req: NextRequest) {
   });
 
   try {
-  await syncSourceToKnowledge({
+  startSourceSyncInBackground({
     sourceId: source.id,
     userId,
     organizationId,
+    reason: "connect",
   });
 } catch (error) {
   console.error("Slack auto-sync failed after connect:", error);
