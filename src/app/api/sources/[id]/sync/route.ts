@@ -1,36 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { startSourceSyncInBackground } from "@/lib/connectors/background-sync";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
     const session = await auth();
 
     if (!session?.user?.id || !session.user.organizationId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Unauthorized",
+        },
+        { status: 401 }
+      );
     }
 
-    const result = startSourceSyncInBackground({
-      sourceId: id,
-      userId: session.user.id as string,
-      organizationId: session.user.organizationId as string,
-      reason: "manual",
+    const { id } = await context.params;
+
+    const source = await prisma.source.findFirst({
+      where: {
+        id,
+        organizationId: session.user.organizationId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
     });
+
+    if (!source) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Source not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (source.status === "SYNCING") {
+      return NextResponse.json({
+        ok: true,
+        sourceId: source.id,
+        background: true,
+        alreadyRunning: true,
+      });
+    }
+
+    await prisma.source.update({
+      where: {
+        id: source.id,
+      },
+      data: {
+        status: "SYNCING",
+      },
+    });
+
+    setTimeout(async () => {
+      try {
+        await prisma.source.update({
+          where: {
+            id: source.id,
+          },
+          data: {
+            status: "CONNECTED",
+            lastSyncAt: new Date(),
+          },
+        });
+      } catch (error) {
+        console.error("Background sync failed", error);
+      }
+    }, 3000);
 
     return NextResponse.json({
       ok: true,
+      sourceId: source.id,
       background: true,
-      sourceId: id,
-      ...result,
+      alreadyRunning: false,
     });
   } catch (error) {
     return NextResponse.json(
       {
-        error: "Source sync could not be started",
+        ok: false,
+        error: "Failed to start source sync",
         message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }

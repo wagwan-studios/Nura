@@ -95,7 +95,6 @@ export async function syncSourceToKnowledge({
 
     return {
       ok: true,
-      provider: source.type,
       ...result,
     };
   } catch (error) {

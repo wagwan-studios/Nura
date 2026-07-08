@@ -1,11 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ingestRawRecord } from "@/lib/knowledge/ingest";
-
-type SyncInput = {
-  sourceId: string;
-  userId: string;
-  organizationId: string;
-};
+import type { ConnectorAdapter, ConnectorSyncContext } from "@/lib/connectors/types";
+import { KnowledgeVisibility } from "@prisma/client";
 
 type DriveFile = {
   id: string;
@@ -128,17 +124,25 @@ async function getDriveFileContent(accessToken: string, file: DriveFile) {
   return "";
 }
 
-export const googleDriveAdapter = {
+export const googleDriveAdapter: ConnectorAdapter = {
   type: "GOOGLE_DRIVE",
+  label: "Google Drive",
   supportsAutoSync: true,
 
-  async sync({ sourceId, userId, organizationId }: SyncInput) {
+  async sync({ sourceId, userId, organizationId }: ConnectorSyncContext) {
     const account = await getConnectedAccount(sourceId, userId);
+    if (!account.accessToken) {
+      throw new Error(
+        "Google Drive access token is missing. Please reconnect Google Drive."
+      );
+    }
+
     const files = await listDriveFiles(account.accessToken);
 
     let synced = 0;
     let skipped = 0;
     let failed = 0;
+    let chunksCreated = 0;
 
     for (const file of files) {
       try {
@@ -149,29 +153,39 @@ export const googleDriveAdapter = {
           continue;
         }
 
-        await ingestRawRecord({
+        const result = await ingestRawRecord({
+          provider: "GOOGLE_DRIVE",
           sourceId,
+          userId,
           organizationId,
           externalId: file.id,
           recordType: "drive_file",
           title: file.name,
-          url: file.webViewLink || null,
-          author:
+          content: `
+Google Drive File: ${file.name}
+URL: ${file.webViewLink || "Unavailable"}
+Owner: ${
             file.owners?.[0]?.emailAddress ||
             file.owners?.[0]?.displayName ||
-            null,
-          occurredAt: file.modifiedTime ? new Date(file.modifiedTime) : null,
-          content,
-          metadata: {
+            "Unknown"
+          }
+Modified: ${file.modifiedTime || "Unknown"}
+
+${content}
+          `,
+          payload: {
+            id: file.id,
+            name: file.name,
             mimeType: file.mimeType,
             modifiedTime: file.modifiedTime,
             webViewLink: file.webViewLink,
             owners: file.owners || [],
           },
-          visibility: "ORG",
+          visibility: KnowledgeVisibility.ORGANIZATION,
         });
 
         synced += 1;
+        chunksCreated += result.chunksCreated;
       } catch (error) {
         failed += 1;
 
@@ -184,10 +198,14 @@ export const googleDriveAdapter = {
     }
 
     return {
+      provider: "GOOGLE_DRIVE",
       recordsSynced: synced,
-      recordsSkipped: skipped,
-      recordsFailed: failed,
-      filesSeen: files.length,
+      chunksCreated,
+      details: {
+        recordsSkipped: skipped,
+        recordsFailed: failed,
+        filesSeen: files.length,
+      },
     };
   },
 };

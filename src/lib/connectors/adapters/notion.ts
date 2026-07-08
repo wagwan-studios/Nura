@@ -1,11 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { ingestRawRecord } from "@/lib/knowledge/ingest";
-
-type SyncInput = {
-  sourceId: string;
-  userId: string;
-  organizationId: string;
-};
+import { decryptToken } from "@/lib/encryption";
+import type { ConnectorAdapter, ConnectorSyncContext } from "@/lib/connectors/types";
+import { KnowledgeVisibility } from "@prisma/client";
 
 type NotionSearchItem = {
   object: string;
@@ -230,22 +227,29 @@ async function getBlockChildren(
   return output;
 }
 
-export const notionAdapter = {
+export const notionAdapter: ConnectorAdapter = {
   type: "NOTION",
   supportsAutoSync: true,
+  label: "Notion",
 
-  async sync({ sourceId, userId, organizationId }: SyncInput) {
+  async sync({ sourceId, userId, organizationId }: ConnectorSyncContext) {
     const account = await getConnectedAccount(sourceId, userId);
-    const pages = await searchNotionPages(account.accessToken);
+    if (!account.accessToken) {
+      throw new Error("Notion access token is missing. Please reconnect Notion.");
+    }
+
+    const accessToken = decryptToken(account.accessToken);
+    const pages = await searchNotionPages(accessToken);
 
     let synced = 0;
     let skipped = 0;
     let failed = 0;
+    let chunksCreated = 0;
 
     for (const page of pages) {
       try {
         const title = getPageTitle(page);
-        const blocks = await getBlockChildren(account.accessToken, page.id);
+        const blocks = await getBlockChildren(accessToken, page.id);
         const content = blocks.join("\n").trim();
 
         if (!content) {
@@ -253,28 +257,34 @@ export const notionAdapter = {
           continue;
         }
 
-        await ingestRawRecord({
+        const result = await ingestRawRecord({
+          provider: "NOTION",
           sourceId,
+          userId,
           organizationId,
           externalId: page.id,
           recordType: "notion_page",
           title,
-          url: page.url || null,
-          author: null,
-          occurredAt: page.last_edited_time
-            ? new Date(page.last_edited_time)
-            : null,
-          content,
-          metadata: {
+          content: `
+Notion Page: ${title}
+URL: ${page.url || "Unavailable"}
+Created: ${page.created_time || "Unknown"}
+Last edited: ${page.last_edited_time || "Unknown"}
+
+${content}
+          `,
+          payload: {
+            id: page.id,
             object: page.object,
             createdTime: page.created_time,
             lastEditedTime: page.last_edited_time,
             url: page.url,
           },
-          visibility: "ORG",
+          visibility: KnowledgeVisibility.ORGANIZATION,
         });
 
         synced += 1;
+        chunksCreated += result.chunksCreated;
       } catch (error) {
         failed += 1;
 
@@ -286,10 +296,14 @@ export const notionAdapter = {
     }
 
     return {
+      provider: "NOTION",
       recordsSynced: synced,
-      recordsSkipped: skipped,
-      recordsFailed: failed,
-      pagesSeen: pages.length,
+      chunksCreated,
+      details: {
+        recordsSkipped: skipped,
+        recordsFailed: failed,
+        pagesSeen: pages.length,
+      },
     };
   },
 };

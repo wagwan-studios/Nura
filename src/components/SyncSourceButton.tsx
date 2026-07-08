@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -15,11 +13,32 @@ type SourceStatus = {
   chunks?: number;
 };
 
+type ApiErrorResponse = {
+  message?: string;
+  error?: string;
+};
+
 type ToastState = {
   type: "success" | "error" | "info";
   title: string;
   message: string;
 } | null;
+
+function getApiErrorMessage(data: unknown, fallback: string) {
+  if (data && typeof data === "object") {
+    const errorData = data as ApiErrorResponse;
+
+    if (typeof errorData.message === "string") {
+      return errorData.message;
+    }
+
+    if (typeof errorData.error === "string") {
+      return errorData.error;
+    }
+  }
+
+  return fallback;
+}
 
 function formatDateTime(value?: string | null) {
   if (!value) return "just now";
@@ -47,8 +66,7 @@ function SyncToast({
         : "#ff6a00";
 
   return (
-    <div
-      style={{
+    <div style={{
         position: "fixed",
         right: 24,
         bottom: 24,
@@ -95,7 +113,6 @@ export function SyncSourceButton({ sourceId }: { sourceId: string }) {
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
-  const [lastKnownSyncAt, setLastKnownSyncAt] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const maxPollCountRef = useRef(0);
@@ -115,13 +132,13 @@ export function SyncSourceButton({ sourceId }: { sourceId: string }) {
       cache: "no-store",
     });
 
-    const data: SourceStatus = await res.json();
+    const data = (await res.json()) as SourceStatus | ApiErrorResponse;
 
     if (!res.ok) {
-      throw new Error((data as any).message || "Could not check sync status");
+      throw new Error(getApiErrorMessage(data, "Could not check sync status"));
     }
 
-    return data;
+    return data as SourceStatus;
   }
 
   async function checkStatus() {
@@ -135,7 +152,6 @@ export function SyncSourceButton({ sourceId }: { sourceId: string }) {
       setSyncing(false);
       setLoading(false);
       setMessage("");
-      setLastKnownSyncAt(latestSyncAt);
       lastKnownSyncAtRef.current = latestSyncAt;
 
       setToast({
@@ -198,19 +214,18 @@ export function SyncSourceButton({ sourceId }: { sourceId: string }) {
 
     try {
       const currentStatus = await fetchStatus().catch(() => null);
-      const currentLastSyncAt = currentStatus?.lastSyncAt || null;
-
-      setLastKnownSyncAt(currentLastSyncAt);
-      lastKnownSyncAtRef.current = currentLastSyncAt;
+      lastKnownSyncAtRef.current = currentStatus?.lastSyncAt || null;
 
       const res = await fetch(`/api/sources/${sourceId}/sync`, {
         method: "POST",
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as ApiErrorResponse & {
+        alreadyRunning?: boolean;
+      };
 
       if (!res.ok) {
-        throw new Error(data.message || data.error || "Sync failed");
+        throw new Error(getApiErrorMessage(data, "Sync failed"));
       }
 
       if (data.alreadyRunning) {
